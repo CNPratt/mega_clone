@@ -54,6 +54,7 @@ public class PM2 : MonoBehaviour
     private Vector2 dirRightGroundNormal = new Vector2(0, 0);
     private Vector2 dirLeftGroundNormal = new Vector2(0, 0);
     private Vector2 moveNormal = new Vector2(0, 0);
+    private int normDirFactor;
 
     // Variables to hold the raycast hits for grounding, walls, and sliding
     List<RaycastHit2D> lateralHits;
@@ -138,9 +139,14 @@ public class PM2 : MonoBehaviour
         return isRight ? new Vector2(-4, 6) : new Vector2(4, 6);
     }
 
-    Vector2 DetermineGroundNormal(bool isRight)
+    //Vector2 DetermineGroundNormal(bool isRight)
+    //{
+    //    return isRight ? dirRightGroundNormal : dirLeftGroundNormal;
+    //}
+
+    int DetermineNormDirFactor(bool isRight)
     {
-        return isRight ? dirRightGroundNormal : dirLeftGroundNormal;
+        return isRight ? 1 : -1;
     }
 
     // This currently gets run when either horizontal input is pressed and is used to
@@ -168,7 +174,9 @@ public class PM2 : MonoBehaviour
         facingRight = IsFacingRight(isRight);
         sprite.flipX = ShouldFlipSprite(isRight);
         slideJumpVec = DetermineWallJumpVec(isRight);
-        moveNormal = DetermineGroundNormal(isRight);
+        //moveNormal = DetermineGroundNormal(isRight);
+
+        normDirFactor = DetermineNormDirFactor(isRight);
 
         AdjustShotPoint(isRight);
 
@@ -399,10 +407,9 @@ public class PM2 : MonoBehaviour
         {
             isGrounded = false;
         }
-        Debug.Log(groundCounter);
 
-        // Arbitray counter value that just seemed to work well
-        if (groundCounter >= 4)
+        // Arbitray counter value that just seemed to work well, used to be 8
+        if (groundCounter >= 6)
         {
             groundCounter = 0;
             isGrounded = true;
@@ -414,24 +421,33 @@ public class PM2 : MonoBehaviour
         if (groundHits[2])
         {
             RaycastHit2D hit = groundHits[2];
-            dirRightGroundNormal = new Vector2(hit.normal.y, -hit.normal.x);
-            Debug.DrawRay(transform.position - new Vector3(.5f, .5f), dirRightGroundNormal, Color.green);
+            moveNormal = new Vector2(hit.normal.y, -hit.normal.x);
+            //dirRightGroundNormal = new Vector2(hit.normal.y, -hit.normal.x);
+            //dirLeftGroundNormal = new Vector2(-hit.normal.y, -hit.normal.x);
+            //Debug.DrawRay(transform.position - new Vector3(.5f, .5f), dirRightGroundNormal, Color.green);
         }
-        else
-        {
-            dirRightGroundNormal = new Vector2(1, 0);
-        }
+        //else
+        //{
+        //    dirRightGroundNormal = new Vector2(1, 0);
+        //}
 
         // Left cast
         if (groundHits[0])
         {
             RaycastHit2D hit = groundHits[0];
-            dirLeftGroundNormal = new Vector2(-hit.normal.y, -hit.normal.x);
-            //Debug.DrawRay(transform.position - new Vector3(.5f, .5f), dirLeftGroundNormal, Color.green);
+            moveNormal = new Vector2(hit.normal.y, -hit.normal.x);
+            //dirRightGroundNormal = new Vector2(-hit.normal.y, -hit.normal.x);
+            //dirLeftGroundNormal = new Vector2(hit.normal.y, -hit.normal.x);
+            //Debug.DrawRay(transform.position - new Vector3(0f, 0f), dirLeftGroundNormal, Color.green);
         }
-        else
+        //else
+        //{
+        //    dirLeftGroundNormal = new Vector2(-1, 0);
+        //}
+
+        if(!isGrounded)
         {
-            dirLeftGroundNormal = new Vector2(-1, 0);
+            moveNormal = new Vector2(1, 0);
         }
 
         // Drag to make you slower aong walls when wall sliding
@@ -465,8 +481,6 @@ public class PM2 : MonoBehaviour
             isSliding = false;
         }
 
-        Debug.Log(horizontal);
-
         // If the character is currently grounded and jump button is pressed
         // Then...jump
         if (jump && isGrounded)
@@ -493,7 +507,7 @@ public class PM2 : MonoBehaviour
             }
             //transform.Translate(new Vector3(movement * speedFactor, 0, 0) * Time.deltaTime);
 
-            transform.Translate(new Vector3(moveNormal.x * 2, moveNormal.y * 2, 0) * Time.deltaTime);
+            transform.Translate(new Vector3(moveNormal.x * 2, moveNormal.y * 2, 0) * normDirFactor * Time.deltaTime);
 
         }
 
@@ -502,7 +516,10 @@ public class PM2 : MonoBehaviour
         //    rb.velocity = new Vector2(0, rb.velocity.y);
         //}
 
-        //Debug.Log(moveNormal);
+        Debug.DrawRay(transform.position, moveNormal * normDirFactor, Color.green);
+
+        Debug.Log(moveNormal * normDirFactor);
+
     }
 
     void FixedUpdate()

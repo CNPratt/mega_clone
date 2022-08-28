@@ -24,6 +24,10 @@ public class PM2 : MonoBehaviour
     public bool isShooting = false;
     public bool isSliding = false;
 
+    // Used to check if we've stopped doing something last frame
+    public bool wasSlidingLastFrame = false;
+    public bool wasGroundedLastFrame = false;
+
     // Unused bool to possibly limit the slide anim playing when jumping very close to ground into walls 
     public bool canSlide = true;
 
@@ -33,6 +37,10 @@ public class PM2 : MonoBehaviour
 
     // Move now essentially tracks if the player should move laterally or not
     public int movement = 0;
+
+    // Variables for dashing
+    public float dashSpeed = 1;
+    public bool canDash = true;
 
     // Left-right axis
     public float horizontal = 0f;
@@ -46,9 +54,11 @@ public class PM2 : MonoBehaviour
 
     // Variable that gets set and then determines wall jump vector
     public Vector2 slideJumpVec = new Vector2(0, 1);
+    public bool isWallJumping = false;
 
-    //public Vector2 jumpInitialVec = new Vector3(0, .5f, 0);
-    //public Vector2 jumpVec = new Vector2(0, 250);
+    // Jump and double jump variables
+    public bool isJumping = false;
+    public bool canDoubleJump = false;
 
     // Groundcast normals to use when determining slope movement
     private Vector2 dirRightGroundNormal = new Vector2(0, 0);
@@ -136,7 +146,7 @@ public class PM2 : MonoBehaviour
 
     Vector2 DetermineWallJumpVec(bool isRight)
     {
-        return isRight ? new Vector2(-4, 6) : new Vector2(4, 6);
+        return isRight ? new Vector2(-2, 4) : new Vector2(2, 4);
     }
 
     //Vector2 DetermineGroundNormal(bool isRight)
@@ -165,7 +175,6 @@ public class PM2 : MonoBehaviour
 
         if (lateralMidHit || lateralTopHit)
         {
-            //Debug.Log("right");
             thisMovement = 0;
         }
 
@@ -183,6 +192,12 @@ public class PM2 : MonoBehaviour
         if (lateralMidHit.collider == true && !isGrounded)
         {
             isSliding = true;
+            canDash = false;
+
+            if(!isWallJumping)
+            {
+                canDoubleJump = false;
+            }
         }
         else
         {
@@ -223,16 +238,16 @@ public class PM2 : MonoBehaviour
         // -.08f length is maximum we'd want to set here and represents the length of the ray.
         // Any more and we'll risk being grounded when we shouldn't be
 
-        Debug.DrawRay(transform.position + new Vector3(-.15f, -.45f, 0), new Vector2(0, -.08f));
-        RaycastHit2D bottomLeft = Physics2D.Raycast(transform.position + new Vector3(-.15f, -.45f, 0), -Vector2.up, .08f, slideMask);
+        Debug.DrawRay(transform.position + new Vector3(-.15f, -.45f, 0), new Vector2(0, -.06f));
+        RaycastHit2D bottomLeft = Physics2D.Raycast(transform.position + new Vector3(-.15f, -.45f, 0), -Vector2.up, .06f, slideMask);
         hits.Add(bottomLeft);
 
-        Debug.DrawRay(transform.position + new Vector3(0, -.45f, 0), new Vector2(0, -.08f));
-        RaycastHit2D bottomMid = Physics2D.Raycast(transform.position + new Vector3(0, -.45f, 0), -Vector2.up, .08f, slideMask);
+        Debug.DrawRay(transform.position + new Vector3(0, -.45f, 0), new Vector2(0, -.06f));
+        RaycastHit2D bottomMid = Physics2D.Raycast(transform.position + new Vector3(0, -.45f, 0), -Vector2.up, .06f, slideMask);
         hits.Add(bottomMid);
 
-        Debug.DrawRay(transform.position + new Vector3(.15f, -.45f, 0), new Vector2(0, -.08f));
-        RaycastHit2D bottomRight = Physics2D.Raycast(transform.position + new Vector3(.15f, -.45f, 0), -Vector2.up, .08f, slideMask);
+        Debug.DrawRay(transform.position + new Vector3(.15f, -.45f, 0), new Vector2(0, -.06f));
+        RaycastHit2D bottomRight = Physics2D.Raycast(transform.position + new Vector3(.15f, -.45f, 0), -Vector2.up, .06f, slideMask);
         hits.Add(bottomRight);
 
         return hits;
@@ -242,12 +257,13 @@ public class PM2 : MonoBehaviour
     // currently located as though the player collider is a square - this could change
     // If either of the four uppermost casts touch a tilemap collider, we will set movement
     // variable to zero. Bottom two are omitted to allow slopes
+    // Top is shortened .01f to account for Physicys2D collision extrusion
     private List<RaycastHit2D> LateralCasts()
     {
         List<RaycastHit2D> hits = new List<RaycastHit2D>();
 
-        RaycastHit2D rightTop = Physics2D.Raycast(transform.position + new Vector3(.25f, .5f, 0), -Vector2.left, .01f, slideMask);
-        Debug.DrawRay(transform.position + new Vector3(.25f, .5f, 0), new Vector2(.01f, 0));
+        RaycastHit2D rightTop = Physics2D.Raycast(transform.position + new Vector3(.25f, .49f, 0), -Vector2.left, .01f, slideMask);
+        Debug.DrawRay(transform.position + new Vector3(.25f, .49f, 0), new Vector2(.01f, 0));
         hits.Add(rightTop);
 
         RaycastHit2D rightMid = Physics2D.Raycast(transform.position + new Vector3(.25f, 0, 0), -Vector2.left, .01f, slideMask);
@@ -258,8 +274,8 @@ public class PM2 : MonoBehaviour
         Debug.DrawRay(transform.position + new Vector3(.25f, -.5f, 0), new Vector2(.01f, 0));
         hits.Add(rightBottom);
 
-        RaycastHit2D leftTop = Physics2D.Raycast(transform.position + new Vector3(-.25f, .5f, 0), Vector2.left, .01f, slideMask);
-        Debug.DrawRay(transform.position + new Vector3(-.25f, .5f, 0), new Vector2(-.01f, 0));
+        RaycastHit2D leftTop = Physics2D.Raycast(transform.position + new Vector3(-.25f, .49f, 0), Vector2.left, .01f, slideMask);
+        Debug.DrawRay(transform.position + new Vector3(-.25f, .49f, 0), new Vector2(-.01f, 0));
         hits.Add(leftTop);
 
         RaycastHit2D leftMid = Physics2D.Raycast(transform.position + new Vector3(-.25f, 0, 0), Vector2.left, .01f, slideMask);
@@ -294,17 +310,12 @@ public class PM2 : MonoBehaviour
         }
     }
 
-    // Unused but is meant to become the coroutine to return player to wall
-    // Mid wall jump if the appropriate input is held
-    private IEnumerator WallJumpDeflector()
-    {
-        yield return new WaitForSeconds(.3f);
-        rb.AddForce(new Vector2(-slideJumpVec.x, 2), ForceMode2D.Impulse);
-    }
-
     // Jump routine using force instead of translate
     private IEnumerator JumpRoutine()
     {
+        isJumping = true;
+        canDoubleJump = true;
+
         rb.velocity = Vector2.zero;
         Vector2 jumpVector = rb.position;
         float jumpTime = .2f;
@@ -312,36 +323,87 @@ public class PM2 : MonoBehaviour
 
         while (Input.GetButton("Jump") && timer < jumpTime)
         {
+            yield return new WaitForFixedUpdate();
             float proportionCompleted = timer / jumpTime;
             Vector2 thisFrameJumpVector = Vector2.Lerp(Vector2.up, Vector2.zero, proportionCompleted);
-            rb.AddForce(thisFrameJumpVector * Time.deltaTime * 50, ForceMode2D.Impulse);
+            rb.AddForce(thisFrameJumpVector, ForceMode2D.Impulse);
             //transform.Translate(thisFrameJumpVector/10);
             timer += Time.deltaTime;
             yield return null;
         }
 
-        // jumping = false;
+        isJumping = false;
     }
 
-    // Unused copy of jump meant to become the coroutine for wall jumping
-    private IEnumerator Walljump()
+    // Not sure how to use arguments with coroutines so make a double
+    private IEnumerator DoubleJumpRoutine()
     {
+        canDoubleJump = false;
+
         rb.velocity = Vector2.zero;
         Vector2 jumpVector = rb.position;
         float jumpTime = .2f;
         float timer = 0;
 
-        while (timer < jumpTime)
+        while (Input.GetButton("Jump") && timer < jumpTime)
         {
+            yield return new WaitForFixedUpdate();
             float proportionCompleted = timer / jumpTime;
-            Vector2 thisFrameJumpVector = Vector2.Lerp(Vector2.up, slideJumpVec, proportionCompleted);
-            //rb.AddForce(thisFrameJumpVector * Time.deltaTime * 50, ForceMode2D.Impulse);
-            transform.Translate(thisFrameJumpVector / 50);
+            Vector2 thisFrameJumpVector = Vector2.Lerp(Vector2.up, Vector2.zero, proportionCompleted);
+            rb.AddForce(thisFrameJumpVector, ForceMode2D.Impulse);
+            //transform.Translate(thisFrameJumpVector/10);
+            timer += Time.deltaTime;
+            yield return null;
+        }
+    }
+
+    // Unused copy of jump meant to become the coroutine for wall jumping
+    private IEnumerator Walljump()
+    {
+        canDash = false;
+        canDoubleJump = true;
+        isWallJumping = true;
+
+        rb.velocity = Vector2.zero;
+        Vector2 jumpVector = slideJumpVec;
+        float jumpTime = .1f;
+        float timer = 0;
+        bool isRight = jumpVector.x > 0 ? true : false;
+        bool isPressingTowardsWall = isRight ? horizontal > 0 : horizontal < 0;
+        
+        while (Input.GetButton("Jump") && timer < jumpTime)
+        {
+            yield return new WaitForFixedUpdate();
+            float proportionCompleted = timer / jumpTime;
+            Vector2 thisFrameJumpVector = Vector2.Lerp(Vector2.zero, jumpVector / 2, proportionCompleted);
+            //rb.AddForce(new Vector2(0, thisFrameJumpVector.y) * Time.deltaTime * 10, ForceMode2D.Impulse);
+            rb.AddForce(new Vector2(0, thisFrameJumpVector.y), ForceMode2D.Impulse);
+            transform.Translate(new Vector2(thisFrameJumpVector.x, 0)/5);
+
             timer += Time.deltaTime;
             yield return null;
         }
 
-        // jumping = false;
+        isWallJumping = false;
+        canDash = true;
+    }
+
+    private IEnumerator Dash()
+    {
+        dashSpeed = 3;
+        float dashTime = .2f;
+        float timer = 0;
+
+        while (Input.GetButton("Fire3") && timer < dashTime)
+        {
+            //wait
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        dashSpeed = 1;
+        yield return null;
+
     }
 
     // Start is called before the first frame update
@@ -409,10 +471,16 @@ public class PM2 : MonoBehaviour
         }
 
         // Arbitray counter value that just seemed to work well, used to be 8
-        if (groundCounter >= 6)
+        if (groundCounter >= 1)
         {
             groundCounter = 0;
             isGrounded = true;
+
+            if(!isJumping)
+            {
+                canDoubleJump = false;
+            }
+
         }
 
         // Check and set slope normals
@@ -422,28 +490,14 @@ public class PM2 : MonoBehaviour
         {
             RaycastHit2D hit = groundHits[2];
             moveNormal = new Vector2(hit.normal.y, -hit.normal.x);
-            //dirRightGroundNormal = new Vector2(hit.normal.y, -hit.normal.x);
-            //dirLeftGroundNormal = new Vector2(-hit.normal.y, -hit.normal.x);
-            //Debug.DrawRay(transform.position - new Vector3(.5f, .5f), dirRightGroundNormal, Color.green);
         }
-        //else
-        //{
-        //    dirRightGroundNormal = new Vector2(1, 0);
-        //}
 
         // Left cast
         if (groundHits[0])
         {
             RaycastHit2D hit = groundHits[0];
             moveNormal = new Vector2(hit.normal.y, -hit.normal.x);
-            //dirRightGroundNormal = new Vector2(-hit.normal.y, -hit.normal.x);
-            //dirLeftGroundNormal = new Vector2(hit.normal.y, -hit.normal.x);
-            //Debug.DrawRay(transform.position - new Vector3(0f, 0f), dirLeftGroundNormal, Color.green);
         }
-        //else
-        //{
-        //    dirLeftGroundNormal = new Vector2(-1, 0);
-        //}
 
         if(!isGrounded)
         {
@@ -488,11 +542,42 @@ public class PM2 : MonoBehaviour
             StartCoroutine("JumpRoutine");
         }
 
+        if (jump && canDoubleJump && !isJumping)
+        {
+            StopCoroutine("JumpRoutine");
+            StartCoroutine("DoubleJumpRoutine");
+        }
+
         // You get it - this is where wall jump coroutine will go
         if (jump && isSliding)
         {
-            rb.AddForce(slideJumpVec, ForceMode2D.Impulse);
+            //rb.AddForce(slideJumpVec, ForceMode2D.Impulse);
+            StopCoroutine("Walljump");
+            StartCoroutine("Walljump");
         }
+
+        if(Input.GetButtonDown("Fire3") && canDash)
+        {
+            StopCoroutine("Dash");
+            StartCoroutine("Dash");
+        }
+
+        // Check if we've dropped from a wall slide or ran off a platform without jumping, and reset
+        // double jump and dash perms
+
+        if (wasSlidingLastFrame && !isSliding && !isWallJumping)
+        {
+            canDoubleJump = true;
+            canDash = true;
+        }
+
+        if(wasGroundedLastFrame && !isGrounded && rb.velocity.y <= 0)
+        {
+            canDoubleJump = true;
+        }
+
+        wasGroundedLastFrame = isGrounded;
+        wasSlidingLastFrame = isSliding;
 
         // Applies lateral movement according to the moveNormal
         // movement variable used to be a literal force but now determines
@@ -505,26 +590,20 @@ public class PM2 : MonoBehaviour
             {
                 speedFactor = 2;
             }
-            //transform.Translate(new Vector3(movement * speedFactor, 0, 0) * Time.deltaTime);
 
-            transform.Translate(new Vector3(moveNormal.x * 2, moveNormal.y * 2, 0) * normDirFactor * Time.deltaTime);
+            // Movement formula
+            transform.Translate(new Vector3(moveNormal.x * 2, moveNormal.y * 2, 0) * normDirFactor * dashSpeed * Time.deltaTime);
 
         }
 
-        //if (movement == 0)
-        //{
-        //    rb.velocity = new Vector2(0, rb.velocity.y);
-        //}
-
         Debug.DrawRay(transform.position, moveNormal * normDirFactor, Color.green);
-
-        Debug.Log(moveNormal * normDirFactor);
+        //Debug.Log(canDash);
+        
 
     }
 
     void FixedUpdate()
     {
         SetAnimParams();
-
     }
 }
